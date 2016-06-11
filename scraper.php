@@ -48,7 +48,7 @@
       }
 
       // Get number of pages using the macro
-      $searchURL = 'https://developer.mozilla.org/en-US/search?locale=*&kumascript_macros=%s';
+      $searchURL = 'https://developer.mozilla.org/en-US/search?locale=*&kumascript_macros=%s&topic=all';
 
       $filePath = $outputFolder . '/search.' . $fileName;
       if (isset($_GET['refresh']) || !file_exists($filePath)) {
@@ -98,7 +98,7 @@
         $class = ' class="onlyUsedByOneMacro"';
       }
     }
-    
+
     file_put_contents($searchResultsFilePath, sprintf('<tr%s><td>%s</td><td>%s</td><td>%s</td></tr>',
         $class, $name, $template['pageCount'], implode($template['macros'], '<br/>')), FILE_APPEND);
   }
