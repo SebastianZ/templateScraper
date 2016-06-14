@@ -29,8 +29,10 @@
     // Fetch each template page
     foreach ($templateURLMatches[1] as $templateURL) {
       preg_match('/\/(.*?)\/docs\/Template:(.+)$/', $templateURL, $pageMatch);
-      $template = str_replace(':', '_', $pageMatch[2]) . ($pageMatch[1] !== 'en-US' ? '.' . $pageMatch[1] : '');
-      $fileName = $template . '.html';
+      $templateName = $pageMatch[2];
+      $locale = $pageMatch[1];
+      $template = $templateName . ($locale !== 'en-US' ? '.' . $locale : '');
+      $fileName = str_replace(':', '_', $template) . '.html';
       $filePath = $outputFolder . '/' . $fileName;
       if (isset($_GET['refresh']) || !file_exists($filePath)) {
         $templateFetchLocation = 'https://developer.mozilla.org' . $templateURL . '?raw';
@@ -40,6 +42,9 @@
 
       $templateResponse = file_get_contents($templateFetchLocation);
       $templates[$template] = [
+        'name' => $templateName,
+        'locale' => $locale,
+        'fileName' => $fileName,
         'content' => $templateResponse
       ];
 
@@ -78,18 +83,18 @@
       }
 
       if (preg_match('/template\(\s*["\']' . $templateName . '/i', $template['content'])) {
-        array_push($templates[$templateName]['macros'], $name);
+        array_push($templates[$templateName]['macros'], urldecode($name));
       }
     }
   }
 
   // Output search results
   $searchResultsFilePath = $outputFolder . '/searchResults.html';
-  file_put_contents($searchResultsFilePath, '<!DOCTYPE html>' .
+  file_put_contents($searchResultsFilePath, '<!DOCTYPE html><head><meta charset="utf-8"/></head>' .
       '<style>table{border-collapse:collapse;}th,td{border:1px solid black;padding:3px;vertical-align:top;}.unused{background:#ffb4b4;}.onlyUsedByOneMacro{background:#ffffb4;}</style>' .
       '<table><thead><tr><th>Template</th><th>Page count</th><th>Macros</th></tr></thead><tbody>');
 
-  foreach ($templates as $name => $template) {
+  foreach ($templates as $template) {
     $class = '';
     if ($template['pageCount'] === 0) {
       if (count($template['macros']) === 0) {
@@ -99,8 +104,8 @@
       }
     }
 
-    file_put_contents($searchResultsFilePath, sprintf('<tr%s><td>%s</td><td>%s</td><td>%s</td></tr>',
-        $class, $name, $template['pageCount'], implode($template['macros'], '<br/>')), FILE_APPEND);
+    file_put_contents($searchResultsFilePath, sprintf('<tr%s><td><a href="https://developer.mozilla.org/%s/docs/Template:%s">%s</a></td><td>%s</td><td>%s</td></tr>',
+        $class, $template['locale'], $template['name'], urldecode($template['name']), $template['pageCount'], implode($template['macros'], '<br/>')), FILE_APPEND);
   }
 
   file_put_contents($searchResultsFilePath, '</tbody></table>', FILE_APPEND);
