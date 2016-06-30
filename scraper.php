@@ -74,6 +74,7 @@
   }
 
   // Get number of macros using the macro
+  $templatesCallingVariableTemplates = [];
   $templateNames = array_keys($templates);
   foreach ($templateNames as $templateName) {
     $templates[$templateName]['macros'] = [];
@@ -84,6 +85,11 @@
 
       if (preg_match('/template\(\s*["\']' . $templateName . '/i', $template['content'])) {
         array_push($templates[$templateName]['macros'], urldecode($name));
+      }
+
+      // Check whether template contains template($0, ...) call
+      if (!in_array($name, $templatesCallingVariableTemplates) && preg_match('/template\(\$0/', $template['content'])) {
+        array_push($templatesCallingVariableTemplates, $name);
       }
     }
   }
