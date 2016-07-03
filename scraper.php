@@ -1,26 +1,30 @@
 <?php
-  set_time_limit(900);
+  set_time_limit(9000);
 
   $templatesURL = 'https://developer.mozilla.org/en-US/docs/templates?page=%d';
   $outputFolder = 'output';
   $templates = [];
+
+  // Get number of pages using the macro
+  const SEARCH_URL = 'https://developer.mozilla.org/en-US/search?locale=*&kumascript_macros=%s&topic=all&page=%d';
+  const SEARCH_FILE_PATH = '%s/search%d.%s';
 
   if (!file_exists($outputFolder)) {
     mkdir($outputFolder);
   }
 
   for ($i = 1; $i <= 7; $i++) {
-    $filePath = $outputFolder . sprintf('/templates%d.html', $i);
-    if (isset($_GET['refresh']) || !file_exists($filePath)) {
+    $templateFilePath = $outputFolder . sprintf('/templates%d.html', $i);
+    if (isset($_GET['refresh']) || !file_exists($templateFilePath)) {
       $fetchLocation = sprintf($templatesURL, $i);
     } else {
-      $fetchLocation = $filePath;
+      $fetchLocation = $templateFilePath;
     }
 
     $response = file_get_contents($fetchLocation);
 
-    if (isset($_GET['refresh']) || !file_exists($filePath)) {
-      file_put_contents($filePath, $response);
+    if (isset($_GET['refresh']) || !file_exists($templateFilePath)) {
+      file_put_contents($templateFilePath, $response);
     }
 
     preg_match('/<ul class="document-list">.+?<\/ul>/s', $response, $templateListMatch);
@@ -33,11 +37,11 @@
       $locale = $pageMatch[1];
       $template = $templateName . ($locale !== 'en-US' ? '.' . $locale : '');
       $fileName = str_replace(':', '_', $template) . '.html';
-      $filePath = $outputFolder . '/' . $fileName;
-      if (isset($_GET['refresh']) || !file_exists($filePath)) {
+      $templateFilePath = $outputFolder . '/' . $fileName;
+      if (isset($_GET['refresh']) || !file_exists($templateFilePath)) {
         $templateFetchLocation = 'https://developer.mozilla.org' . $templateURL . '?raw';
       } else {
-        $templateFetchLocation = $filePath;
+        $templateFetchLocation = $templateFilePath;
       }
 
       $templateResponse = file_get_contents($templateFetchLocation);
@@ -48,24 +52,22 @@
         'content' => $templateResponse
       ];
 
-      if (isset($_GET['refresh']) || !file_exists($filePath)) {
-        file_put_contents($filePath, $templateResponse);
+      if (isset($_GET['refresh']) || !file_exists($templateFilePath)) {
+        file_put_contents($templateFilePath, $templateResponse);
       }
 
-      // Get number of pages using the macro
-      $searchURL = 'https://developer.mozilla.org/en-US/search?locale=*&kumascript_macros=%s&topic=all';
-
-      $filePath = $outputFolder . '/search.' . $fileName;
-      if (isset($_GET['refresh']) || !file_exists($filePath)) {
-        $searchFetchLocation = sprintf($searchURL, $template);
+      $searchFilePath = sprintf(SEARCH_FILE_PATH, $outputFolder, 1, $fileName);
+      if (isset($_GET['refresh']) || !file_exists($searchFilePath)) {        $searchFetchLocation = sprintf(SEARCH_URL, $template, 1);
       } else {
-        $searchFetchLocation = $filePath;
+        $searchFetchLocation = $searchFilePath;
       }
 
       $searchResponse = file_get_contents($searchFetchLocation);
 
-      if (isset($_GET['refresh']) || !file_exists($filePath)) {
-        file_put_contents($filePath, $searchResponse);
+      $templates[$template]['searchResponses'] = [$searchResponse];
+
+      if (isset($_GET['refresh']) || !file_exists($searchFilePath)) {
+        file_put_contents($searchFilePath, $searchResponse);
       }
 
       preg_match('/(\d+) documents? found/', $searchResponse, $searchResultCount);
@@ -99,6 +101,28 @@
   file_put_contents($searchResultsFilePath, '<!DOCTYPE html><head><meta charset="utf-8"/></head>' .
       '<style>table{border-collapse:collapse;}th,td{border:1px solid black;padding:3px;vertical-align:top;}.unused{background:#ffb4b4;}.onlyUsedByOneMacro{background:#ffffb4;}</style>' .
       '<table><thead><tr><th>Template</th><th>Page count</th><th>Macros</th></tr></thead><tbody>');
+
+  foreach($templatesCallingVariableTemplates as $templateName) {
+    $numberOfSearchResultPages = ceil($templates[$templateName]['pageCount'] / 10);
+    for($i = 1; $i <= $numberOfSearchResultPages; $i++) {
+      if ($i === 1) {
+        $searchResponse = $templates[$templateName]['searchResponses'][0];
+      } else {
+        $searchFilePath = sprintf(SEARCH_FILE_PATH, $outputFolder, $i, $templates[$templateName]['fileName']);
+        if (isset($_GET['refresh']) || !file_exists($searchFilePath)) {
+          // Fetch search result page
+          $searchFetchLocation = sprintf(SEARCH_URL, $templateName, $i);
+          $searchResponse = file_get_contents($searchFetchLocation);
+
+          file_put_contents($searchFilePath, $searchResponse);
+        } else {
+          $searchResponse = file_get_contents($searchFilePath);
+        }
+
+        array_push($templates[$templateName]['searchResponses'], $searchResponse);
+      }
+    }
+  }
 
   foreach ($templates as $template) {
     $class = '';
