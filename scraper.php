@@ -102,6 +102,7 @@
       '<style>table{border-collapse:collapse;}th,td{border:1px solid black;padding:3px;vertical-align:top;}.unused{background:#ffb4b4;}.onlyUsedByOneMacro{background:#ffffb4;}</style>' .
       '<table><thead><tr><th>Template</th><th>Page count</th><th>Macros</th></tr></thead><tbody>');
 
+  // Add templates calling other templates used as macros within pages
   foreach($templatesCallingVariableTemplates as $templateName) {
     $numberOfSearchResultPages = ceil($templates[$templateName]['pageCount'] / 10);
     for($i = 1; $i <= $numberOfSearchResultPages; $i++) {
@@ -149,8 +150,24 @@
         }
       }
     }
+
+    // Add templates calling other templates within templates
+    foreach ($templates as $template) {
+      if ($template === $templateName) {
+        continue;
+      }
+
+      if (preg_match_all('/template\([\'"]' . $templateName . '[\'"],\s*\[[\'"](.+?)[\'"]\]/i', $template['content'], $templateCallMatches)) {
+        foreach ($templateCallMatches[1] as $calledTemplateName) {
+          if (!in_array($templateName, $templates[$calledTemplateName]['macros'])) {
+            array_push($templates[$calledTemplateName]['macros'], $templateName);
+          }
+        }
+      }
+    }
   }
 
+  // Prepare CSS classes for output
   foreach ($templates as $template) {
     $class = '';
     if ($template['pageCount'] === 0) {
