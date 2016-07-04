@@ -120,6 +120,33 @@
         }
 
         array_push($templates[$templateName]['searchResponses'], $searchResponse);
+
+        // Get pages calling the template
+        preg_match_all('/<h4>.*?<a href="(.*?\/([^\/]*?)\/docs\/.+?)".*?>(.+?)<\/a>/is', $searchResponse, $pageURLMatches);
+        $pageURLMatchCount = count($pageURLMatches[0]);
+
+        for($j = 0; $j < $pageURLMatchCount; $j++) {
+          $locale = $pageURLMatches[2][$j];
+          $pageName = $pageURLMatches[3][$j] . ($locale !== 'en-US' ? '.' . $locale : '');
+          $fileName = substr(urlencode(str_replace(':', '_', $pageName)), 0, 180);
+          $pageFilePath = $outputFolder . '/' . $fileName . '.html';
+          if (isset($_GET['refresh']) || !file_exists($pageFilePath)) {
+            // Fetch page calling template
+            $pageResponse = file_get_contents($pageURLMatches[1][$j] . '?raw');
+  
+            file_put_contents($pageFilePath, $pageResponse);
+          } else {
+            $pageResponse = file_get_contents($pageFilePath);
+          }
+
+          preg_match_all('/\{\{\s*' . $templateName . '\([\'"](.+?)[\'"]/i', $pageResponse, $macroMatches);
+
+          foreach($macroMatches[1] as $calledTemplateName) {
+            if (!in_array($templateName, $templates[$calledTemplateName]['macros'])) {
+              array_push($templates[$calledTemplateName]['macros'], $templateName);
+            }
+          }
+        }
       }
     }
   }
